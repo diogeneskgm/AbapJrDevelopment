@@ -21,7 +21,6 @@ IF vbak-auart EQ c_zsub.
         FROM TVARVC
        WHERE name EQ c_tvarv.
 
-
         IF sy-subrc IS INITIAL.
           vbap-arktx = wa_tvarv-low.
 
