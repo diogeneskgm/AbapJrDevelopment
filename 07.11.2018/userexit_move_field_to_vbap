@@ -1,0 +1,11 @@
+FORM userexit_move_field_to_vbap.
+
+ENHANCEMENT 2  ZESD_CHANGETEXTITEM.    "active version
+
+"Plennus - DKGM - Mudança descrição material (ZSUB) - 07.11.2018 - Início.
+  INCLUDE ZSDI_CHANGETEXTITEM IF FOUND.
+"Plennus - DKGM - Mudança descrição material (ZSUB) - 07.11.2018 - Fim.
+
+ENDENHANCEMENT.
+
+ENDFORM.

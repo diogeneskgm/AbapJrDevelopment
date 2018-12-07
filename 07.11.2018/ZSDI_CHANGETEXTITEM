@@ -1,0 +1,32 @@
+*&---------------------------------------------------------------------*
+*& Include          ZSDI_CHANGETEXTITEM
+*&---------------------------------------------------------------------*
+DATA: wa_vbap  TYPE vbap,
+      wa_tvarv TYPE tvarvc,
+      v_ownpr  TYPE mbew-ownpr.
+
+CONSTANTS: c_zsub  TYPE vbak-auart  VALUE 'ZSUB',
+           c_tvarv TYPE tvarvc-name VALUE 'ZSD_CHANGETEXTITEM'.
+
+IF vbak-auart EQ c_zsub.
+  SELECT SINGLE ownpr
+    FROM MBEW
+    into v_ownpr
+   WHERE matnr EQ vbap-matnr
+     AND bwkey EQ vbap-vstel.
+
+    IF sy-subrc IS INITIAL.
+      SELECT SINGLE *
+        INTO wa_tvarv
+        FROM TVARVC
+       WHERE name EQ c_tvarv.
+
+
+        IF sy-subrc IS INITIAL.
+          vbap-arktx = wa_tvarv-low.
+
+        ENDIF.
+
+    ENDIF.
+
+ENDIF.
