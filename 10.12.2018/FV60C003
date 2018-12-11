@@ -1,0 +1,17 @@
+*---------------------------------------------------------------------*
+*       For each reference document an invoice is created
+*---------------------------------------------------------------------*
+FORM DATEN_KOPIEREN_003.
+  DATA: BEGIN OF ZUK,
+          MODUL(3) VALUE '003',
+          VTWEG LIKE VBAK-VTWEG,
+          SPART LIKE VBAK-SPART,
+          VGBEL LIKE VBRP-VGBEL,
+        END OF ZUK.
+  ZUK-VTWEG = VBAK-VTWEG.
+  ZUK-SPART = VBAK-SPART.
+  IF KURGV-PERFK = SPACE.
+    ZUK-VGBEL = VBRP-VGBEL.
+  ENDIF.
+  VBRK-ZUKRI = ZUK.
+ENDFORM.
