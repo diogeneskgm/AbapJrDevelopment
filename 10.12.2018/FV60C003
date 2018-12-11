@@ -17,9 +17,9 @@ FORM DATEN_KOPIEREN_003.
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""$"$\SE:(1) Form. DATEN_KOPIEREN_003, Fim                                                                                                                     A
 *$*$-Start: (1)---------------------------------------------------------------------------------$*$*
 ENHANCEMENT 1  ZESD_RV60C003_ZSDI_FILLVBRK.    "active version
-"Plennus - DKGM - Split fatura tipo (ZSUB) - 10.12.2018 - Início.
+
 INCLUDE ZSDI_FILLVBRK IF FOUND.
-"Plennus - DKGM - Split fatura tipo (ZSUB) - 10.12.2018 - Fim.
+
 ENDENHANCEMENT.
 *$*$-End:   (1)---------------------------------------------------------------------------------$*$*
 ENDFORM.
