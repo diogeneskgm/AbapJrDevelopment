@@ -1,0 +1,25 @@
+*&---------------------------------------------------------------------*
+*& Include          ZSDI_FILLVBRK
+*&---------------------------------------------------------------------*
+
+* Critério para split
+DATA: BEGIN OF zzuk,
+          modul(3) VALUE '001',
+          fkart LIKE vbrk-fkart,
+          vbeln like lips-vbeln,
+          pstyv LIKE vbrp-pstyv,
+      END OF zzuk.
+
+CONSTANTS c_zsub type vbrk-fkart value 'ZSUB'.
+
+IF vbrk-fkart eq c_zsub.
+  IF vbrp-pstyv eq c_zsub.
+
+    zzuk-fkart = c_zsub.
+    zzuk-vbeln = lips-vbeln.
+    zzuk-pstyv = c_zsub.
+
+    vbrk-zukri = zzuk.
+
+  ENDIF.
+ENDIF.
