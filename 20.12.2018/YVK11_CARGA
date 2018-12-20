@@ -1,0 +1,940 @@
+REPORT  yvk11_carga.
+*----------------------------------------------------------------------*
+* Tipos
+*----------------------------------------------------------------------*
+TYPE-POOLS: slis.
+
+TYPES:
+"A821 - Centro x UF x Emissor x SKU
+BEGIN OF ty_exca821,
+        kschl     TYPE a821-kschl,   "Tipo de condição
+        werks     TYPE a821-werks,   "Centro
+        zztxjcd   TYPE a821-zztxjcd, "Domicílio fiscal
+        kunnr     TYPE a821-kunnr,   "Nº cliente
+        matnr     TYPE a821-matnr,   "Nº do material
+        montante  TYPE c LENGTH 15,  "Montante
+        konwa     TYPE konp-konwa,   "Unidade de condição
+        "datab   TYPE a821-datab,    "Início validade
+        "datbi   TYPE a821-datbi,    "Fim validade.
+        datai     TYPE c LENGTH 10,
+        dataf     TYPE c LENGTH 10,
+  END OF ty_exca821,
+
+"A824 - Centro x UF x Rede x SKU
+BEGIN OF ty_exca824,
+        kschl    TYPE a824-kschl,   "Tipo de condição
+        werks    TYPE a824-werks,   "Centro
+        zztxjcd  TYPE a824-zztxjcd, "Domicílio fiscal
+        hienr    TYPE a824-hienr,   "Nº cliente
+        matnr    TYPE a824-matnr,   "Nº do material
+        montante TYPE c LENGTH 15,  "Montante
+        konwa    TYPE konp-konwa,   "Unidade de condição
+        "datab   TYPE a824-datab,   "Início validade
+        "datbi   TYPE a824-datbi,   "Fim validade.
+        datai    TYPE c LENGTH 10,
+        dataf    TYPE c LENGTH 10,
+END OF ty_exca824,
+
+"A826 - Centro x UF x Grupo x SKU
+BEGIN OF ty_exca826,
+        kschl    TYPE a826-kschl,   "Tipo de condição
+        werks    TYPE a826-werks,   "Centro
+        zztxjcd  TYPE a826-zztxjcd, "Domicílio fiscal
+        hienr    TYPE a826-hienr,   "Cliente
+        matnr    TYPE a826-matnr,   "Nº do material
+        montante TYPE c LENGTH 15,  "Montante
+        konwa    TYPE konp-konwa,   "Unidade de condição
+        "datab   TYPE a826-datab,   "Início validade
+        "datbi   TYPE a826-datbi,   "Fim validade.
+        datai    TYPE c LENGTH 10,
+        dataf    TYPE c LENGTH 10,
+END OF ty_exca826,
+
+"A828 - Centro x UF x Canal x SKU
+BEGIN OF ty_exca828,
+        kschl    TYPE a828-kschl,   "Tipo de condição
+        werks    TYPE a828-werks,   "Centro
+        zztxjcd  TYPE a828-zztxjcd, "Domicílio fiscal
+        konda    TYPE a828-konda,   "Grupo de preço cliente
+        matnr    TYPE a828-matnr,   "Nº do material
+        montante TYPE c LENGTH 15,  "Montante
+        konwa    TYPE konp-konwa,   "Unidade de condição
+        "datab   TYPE a828-datab,   "Início validade
+        "datbi   TYPE a828-datbi,   "Fim validade.
+        datai  TYPE c LENGTH 10,
+        dataf  TYPE c LENGTH 10,
+END OF ty_exca828,
+
+BEGIN OF type_tab,
+rec(1000) TYPE c,
+END OF type_tab,
+
+BEGIN OF ty_tbmsg,
+  arquivo  TYPE c LENGTH 100,
+  linha    TYPE c LENGTH 6,
+  mensagem TYPE c LENGTH 100,
+END OF ty_tbmsg.
+
+*----------------------------------------------------------------------*
+* Tabelas Internas
+*----------------------------------------------------------------------*
+* Tabela de controle carga Excel
+DATA: it_excela821 TYPE STANDARD TABLE OF ty_exca821,
+      it_excela824 TYPE STANDARD TABLE OF ty_exca824,
+      it_excela826 TYPE STANDARD TABLE OF ty_exca826,
+      it_excela828 TYPE STANDARD TABLE OF ty_exca828,
+      it_shdb      TYPE TABLE OF bdcdata,
+      it_itab      TYPE TABLE OF type_tab,
+      it_msg       TYPE TABLE OF bdcmsgcoll WITH HEADER LINE.
+
+*----------------------------------------------------------------------*
+* Workareas
+*----------------------------------------------------------------------*
+DATA: wa_exca821 TYPE ty_exca821,
+      wa_exca824 TYPE ty_exca824,
+      wa_exca826 TYPE ty_exca826,
+      wa_exca828 TYPE ty_exca828,
+      wa_itab    TYPE type_tab,
+      wa_shdb    TYPE bdcdata.
+
+*----------------------------------------------------------------------*
+*Declarações para ALV.
+*----------------------------------------------------------------------*
+DATA: st_table    TYPE REF TO cl_salv_table,
+      st_function TYPE REF TO cl_salv_functions,
+      st_tbmsg    TYPE TABLE OF ty_tbmsg,
+*      st_header   type ref to
+      st_wamsg    TYPE ty_tbmsg,
+* Definição para ALV
+      t_fieldcat    TYPE slis_t_fieldcat_alv,
+      t_layout      TYPE slis_layout_alv,
+      t_print       TYPE slis_print_alv,
+      t_sort        TYPE slis_t_sortinfo_alv,
+      st_fieldcat   TYPE slis_fieldcat_alv.
+
+*----------------------------------------------------------------------*
+* Variáveis Globais                                                    *
+*----------------------------------------------------------------------*
+DATA: w_text     TYPE natxt,
+      v_erro,
+      v_nln      TYPE i,
+      v_nseq1(5) TYPE n,
+      v_op(05)   TYPE c,
+      v_repid    LIKE syst-repid,
+      w_dynnr    LIKE syst-dynnr,
+      v_tabix    TYPE sy-tabix.
+*----------------------------------------------------------------------*
+* Constantes                                                           *
+*----------------------------------------------------------------------*
+CONSTANTS: c_1     VALUE '1',
+           c_01(2) VALUE '01',
+           c_2     VALUE '2',
+           c_0     VALUE '0',
+           c_x     VALUE 'X',
+           c_07(2) VALUE '07'.
+*----------------------------------------------------------------------*
+* Tela de Seleção
+*----------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-001.
+PARAMETERS: vfile  TYPE rlgrap-filename MODIF ID md1. "Local
+SELECTION-SCREEN BEGIN OF BLOCK frame1 WITH FRAME TITLE text-004.
+SELECTION-SCREEN ULINE /15(50).
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN POSITION 15.
+PARAMETERS: rb1 RADIOBUTTON GROUP rb.
+SELECTION-SCREEN COMMENT 20(50) text-009. "Centro x UF x Emissor x SKU
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN POSITION 15.
+PARAMETERS: rb2 RADIOBUTTON GROUP rb.
+SELECTION-SCREEN COMMENT 20(50) text-010. "Centro x UF x Rede x SKU
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN POSITION 15.
+PARAMETERS: rb3 RADIOBUTTON GROUP rb.
+SELECTION-SCREEN COMMENT 20(50) text-011. "Centro x UF x Grupo x SKU
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN POSITION 15.
+PARAMETERS: rb4 RADIOBUTTON GROUP rb.
+SELECTION-SCREEN COMMENT 20(50) text-008. "Centro x UF x Canal x SKU
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN ULINE /15(50).
+SELECTION-SCREEN END OF BLOCK frame1.
+SELECTION-SCREEN END OF BLOCK b1.
+
+***********************************************************************
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR vfile.
+
+  MOVE syst-repid TO v_repid.
+  MOVE syst-dynnr TO w_dynnr.
+
+  CALL FUNCTION 'KD_GET_FILENAME_ON_F4'
+    EXPORTING
+      program_name  = v_repid
+      dynpro_number = w_dynnr
+    CHANGING
+      file_name     = vfile
+    EXCEPTIONS
+      mask_too_long = 1
+      OTHERS        = 2.
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+*---------------------------------------------------------------------*
+* AT SELECTION-SCREEN OUTPUT                                          *
+*---------------------------------------------------------------------*
+AT SELECTION-SCREEN OUTPUT.
+
+*----------------------------------------------------------------------*
+* Start-of-Selection
+*----------------------------------------------------------------------*
+INITIALIZATION.
+
+START-OF-SELECTION.
+
+  IF NOT vfile IS INITIAL.
+
+    IF NOT rb1 IS INITIAL.     "Centro x UF x Emissor x SKU
+      IF sy-batch NE 'X'.
+        PERFORM zf_carregar_exc1.
+
+      ELSE.
+        PERFORM zf_carregar_background.
+
+      ENDIF.
+
+      IF NOT it_excela821 IS INITIAL.
+        PERFORM zf_shdb_a821.
+
+      ELSE.
+        MESSAGE 'Arquivo sem dados para atualização ou aberto na maquina!!' TYPE 'I' DISPLAY LIKE 'W'.
+        LEAVE LIST-PROCESSING.
+      ENDIF.
+
+    ELSEIF NOT rb2 IS INITIAL. "Centro x UF x Rede x SKU
+      IF sy-batch NE 'X'.
+        PERFORM zf_carregar_exc2.
+
+      ELSE.
+        PERFORM zf_carregar_background.
+
+      ENDIF.
+
+      IF NOT it_excela824 IS INITIAL.
+        PERFORM zf_shdb_a824.
+
+      ELSE.
+        MESSAGE 'Arquivo sem dados para atualização ou aberto na maquina!!' TYPE 'I' DISPLAY LIKE 'W'.
+        LEAVE LIST-PROCESSING.
+      ENDIF.
+
+    ELSEIF NOT rb3 IS INITIAL.
+      IF sy-batch NE 'X'.
+        PERFORM zf_carregar_exc4. "Centro x UF x Grupo x SKU
+
+      ELSE.
+        PERFORM zf_carregar_background.
+
+      ENDIF.
+
+      IF NOT it_excela826 IS INITIAL.
+        PERFORM zf_shdb_a826.
+
+      ELSE.
+        MESSAGE 'Arquivo sem dados para atualização ou aberto na maquina!!' TYPE 'I' DISPLAY LIKE 'W'.
+        LEAVE LIST-PROCESSING.
+      ENDIF.
+
+    ELSEIF NOT rb4 IS INITIAL.
+      IF sy-batch NE 'X'.
+        PERFORM zf_carregar_exc3. "Centro x UF x Canal x SKU
+
+      ELSE.
+        PERFORM zf_carregar_background.
+
+      ENDIF.
+
+      IF NOT it_excela828 IS INITIAL.
+        PERFORM zf_shdb_a828.
+
+      ELSE.
+        MESSAGE 'Arquivo sem dados para atualização ou aberto na maquina!!' TYPE 'I' DISPLAY LIKE 'W'.
+        LEAVE LIST-PROCESSING.
+      ENDIF.
+
+    ENDIF.
+
+    IF NOT st_tbmsg IS INITIAL.
+      MESSAGE 'Linhas não atualizadas' TYPE 'I' DISPLAY LIKE 'W'.
+      PERFORM zf_build_catalog.
+      PERFORM zf_exibir_rel.
+    ELSE.
+      MESSAGE 'Atualização realizada sem erro !!' TYPE 'S'.
+    ENDIF.
+
+  ELSE.
+    MESSAGE 'Informar um arquivo para prosseguir com atualização' TYPE 'I' DISPLAY LIKE 'W'.
+  ENDIF.
+*&---------------------------------------------------------------------*
+*&      Form  ZF_CARREGAR_EXC1
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_carregar_exc1.
+  DATA: vfile_s TYPE string.
+
+  vfile_s = vfile.
+
+  CLEAR: it_itab.
+
+  IF NOT  vfile_s IS INITIAL.
+    CALL FUNCTION 'GUI_UPLOAD'
+      EXPORTING
+        filename                = vfile_s
+      TABLES
+        data_tab                = it_itab
+      EXCEPTIONS
+        file_open_error         = 1
+        file_read_error         = 2
+        no_batch                = 3
+        gui_refuse_filetransfer = 4
+        invalid_type            = 5
+        no_authority            = 6
+        unknown_error           = 7
+        bad_data_format         = 8
+        header_not_allowed      = 9
+        separator_not_allowed   = 10
+        header_too_long         = 11
+        unknown_dp_error        = 12
+        access_denied           = 13
+        dp_out_of_memory        = 14
+        disk_full               = 15
+        dp_timeout              = 16
+        OTHERS                  = 17.
+
+    IF sy-subrc IS INITIAL.
+
+      LOOP AT it_itab INTO wa_itab.
+        IF NOT sy-tabix EQ c_1.
+          SPLIT wa_itab AT ';' INTO wa_exca821-kschl
+                                    wa_exca821-werks
+                                    wa_exca821-zztxjcd
+                                    wa_exca821-kunnr
+                                    wa_exca821-matnr
+                                    wa_exca821-montante
+                                    wa_exca821-konwa
+                                    wa_exca821-datai
+                                    wa_exca821-dataf.
+
+          APPEND wa_exca821 TO it_excela821.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+  ENDIF.
+ENDFORM.                    " ZF_CARREGAR_EXC1
+*&---------------------------------------------------------------------*
+*&      Form  ZF_CARREGAR_EXC2
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_carregar_exc2.
+  DATA: vfile_s TYPE string.
+
+  vfile_s = vfile.
+
+  CLEAR: it_itab.
+
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = vfile_s
+    TABLES
+      data_tab                = it_itab
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+
+  IF sy-subrc IS INITIAL.
+
+    LOOP AT it_itab INTO wa_itab.
+      IF NOT sy-tabix EQ c_1.
+        SPLIT wa_itab AT ';' INTO wa_exca824-kschl
+                                  wa_exca824-werks
+                                  wa_exca824-zztxjcd
+                                  wa_exca824-hienr
+                                  wa_exca824-matnr
+                                  wa_exca824-montante
+                                  wa_exca824-konwa
+                                  wa_exca824-datai
+                                  wa_exca824-dataf.
+
+        APPEND wa_exca824 TO it_excela824.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.                    " ZF_CARREGAR_EXC2
+*&---------------------------------------------------------------------*
+*&      Form  ZF_CARREGAR_EXC3
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_carregar_exc3 .
+  DATA: vfile_s TYPE string.
+
+  vfile_s = vfile.
+
+  CLEAR: it_itab.
+
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = vfile_s
+    TABLES
+      data_tab                = it_itab
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+
+  IF sy-subrc IS INITIAL.
+
+    LOOP AT it_itab INTO wa_itab.
+      IF NOT sy-tabix EQ c_1.
+        SPLIT wa_itab AT ';' INTO wa_exca828-kschl
+                                  wa_exca828-werks
+                                  wa_exca828-zztxjcd
+                                  wa_exca828-konda
+                                  wa_exca828-matnr
+                                  wa_exca828-montante
+                                  wa_exca828-konwa
+                                  wa_exca828-datai
+                                  wa_exca828-dataf.
+
+        APPEND wa_exca828 TO it_excela828.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.                    " ZF_CARREGAR_EXC3
+*&---------------------------------------------------------------------*
+*&      Form  ZF_CARREGAR_EXC4
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_carregar_exc4.
+  DATA: vfile_s TYPE string.
+
+  vfile_s = vfile.
+
+  CLEAR: it_itab.
+
+  CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = vfile_s
+    TABLES
+      data_tab                = it_itab
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+
+  IF sy-subrc IS INITIAL.
+
+    LOOP AT it_itab INTO wa_itab.
+      IF NOT sy-tabix EQ c_1.
+        SPLIT wa_itab AT ';' INTO wa_exca826-kschl
+                                  wa_exca826-werks
+                                  wa_exca826-zztxjcd
+                                  wa_exca826-hienr
+                                  wa_exca826-matnr
+                                  wa_exca826-montante
+                                  wa_exca826-konwa
+                                  wa_exca826-datai
+                                  wa_exca826-dataf.
+
+        APPEND wa_exca826 TO it_excela826.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+ENDFORM.                    " ZF_CARREGAR_EXC4
+*&---------------------------------------------------------------------*
+*&      Form  ZF_SHDB_A821
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_shdb_a821.
+
+  LOOP AT it_excela821 INTO wa_exca821.
+
+    v_tabix = sy-tabix.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'   'SAPMV13A'          '0100',
+    ' '   'BDC_CURSOR'        'RV13A-KSCHL',
+    ' '   'BDC_OKCODE'        '/00',
+    ' '   'RV13A-KSCHL'       wa_exca821-kschl.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'   'SAPLV14A'          '0100',
+    ' '   'BDC_CURSOR'        'RV130-SELKZ(01)',
+    ' '   'BDC_OKCODE'        '=WEIT'.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'   'SAPMV13A'         '1821',
+    ' '   'BDC_CURSOR'       'RV13A-DATBI(01)',
+    ' '   'BDC_OKCODE'       '/00',
+    ' '   'KOMG-WERKS'       wa_exca821-werks,
+    ' '   'KOMG-ZZTXJCD'     wa_exca821-zztxjcd,
+    ' '   'KOMG-KUNNR'       wa_exca821-kunnr,
+    ' '   'KOMG-MATNR(01)'   wa_exca821-matnr,
+    ' '   'KOMG-KBSTAT(01)'  ' ',
+    ' '   'KONP-KBETR(01)'   wa_exca821-montante,
+    ' '   'KONP-KONWA(01)'   wa_exca821-konwa,
+    ' '   'KONP-KPEIN(01)'   ' ',
+    ' '   'KONP-KMEIN(01)'   ' ',
+    ' '   'RV13A-DATAB(01)'  wa_exca821-datai,
+    ' '   'RV13A-DATBI(01)'  wa_exca821-dataf.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'   'SAPMV13A'         '1821',
+    ' '   'BDC_CURSOR'       'KOMG-MATNR(01)',
+    ' '   'BDC_OKCODE'       '/00'.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'   'SAPMV13A'         '1821',
+    ' '   'BDC_CURSOR'       'KOMG-MATNR(01)',
+    ' '   'BDC_OKCODE'       '=SICH'.
+
+    PERFORM zf_executa_vk11.
+
+  ENDLOOP.
+
+ENDFORM.                    " ZF_SHDB_A821
+*&---------------------------------------------------------------------*
+*&      Form  ZF_SHDB_A824
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_shdb_a824.
+
+  v_tabix = sy-tabix.
+
+  LOOP AT it_excela824 INTO wa_exca824.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'           '0100',
+    ' ' 'BDC_CURSOR'         'RV13A-KSCHL',
+    ' ' 'BDC_OKCODE'         '/00',
+    ' ' 'RV13A-KSCHL'        wa_exca824-kschl.
+
+    PERFORM zf_preenche_shdb USING:
+     'X'  'SAPLV14A'         '0100',
+     ' '  'BDC_CURSOR'       'RV130-SELKZ(02)',
+     ' '  'BDC_OKCODE'       '=WEIT',
+     ' '  'RV130-SELKZ(01)'  ' ',
+     ' '  'RV130-SELKZ(02)'  'X'.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'  'SAPMV13A'          '1824',
+    ' '  'BDC_CURSOR'        'RV13A-DATBI(01)',
+    ' '  'BDC_OKCODE'        '/00',
+    ' '  'KOMG-WERKS'        wa_exca824-werks,
+    ' '  'KOMG-ZZTXJCD'      wa_exca824-zztxjcd,
+    ' '  'KOMG-HIENR'        wa_exca824-hienr,
+    ' '  'KOMG-MATNR(01)'    wa_exca824-matnr,
+    ' '  'KONP-KBETR(01)'    wa_exca824-montante,
+    ' '  'KONP-KONWA(01)'    wa_exca824-konwa,
+    ' '  'RV13A-DATAB(01)'   wa_exca824-datai,
+    ' '  'RV13A-DATBI(01)'   wa_exca824-dataf.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'           '1824',
+    ' ' 'BDC_CURSOR'         'KOMG-MATNR(01)',
+    ' '	'BDC_OKCODE'         '=SICH'.
+
+    PERFORM zf_executa_vk11.
+
+  ENDLOOP.
+
+ENDFORM.                    " ZF_SHDB_A824
+*&---------------------------------------------------------------------*
+*&      Form  ZF_SHDB_A826
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_shdb_a826.
+
+  v_tabix = sy-tabix.
+
+  LOOP AT it_excela826 INTO wa_exca826.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'           '0100',
+    ' ' 'BDC_CURSOR'         'RV13A-KSCHL',
+    ' ' 'BDC_OKCODE'         '/00',
+    ' ' 'RV13A-KSCHL'        wa_exca826-kschl.
+
+    PERFORM zf_preenche_shdb USING:
+     'X'  'SAPLV14A'         '0100',
+     ' '  'BDC_CURSOR'       'RV130-SELKZ(04)',
+     ' '  'BDC_OKCODE'       '=WEIT',
+     ' '  'RV130-SELKZ(01)'  ' ',
+     ' '  'RV130-SELKZ(04)'  'X'.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'  'SAPMV13A'          '1826',
+    ' '  'BDC_CURSOR'        'RV13A-DATBI(01)',
+    ' '  'BDC_OKCODE'        '/00',
+    ' '  'KOMG-WERKS'        wa_exca826-werks,
+    ' '  'KOMG-ZZTXJCD'      wa_exca826-zztxjcd,
+    ' '  'KOMG-HIENR'        wa_exca826-hienr,
+    ' '  'KOMG-MATNR(01)'    wa_exca826-matnr,
+    ' '  'KONP-KBETR(01)'    wa_exca826-montante,
+    ' '  'KONP-KONWA(01)'    wa_exca826-konwa,
+    ' '  'RV13A-DATAB(01)'   wa_exca826-datai,
+    ' '  'RV13A-DATBI(01)'   wa_exca826-dataf.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'           '1826',
+    ' ' 'BDC_CURSOR'         'KOMG-MATNR(01)',
+    ' '	'BDC_OKCODE'         '=SICH'.
+
+    PERFORM zf_executa_vk11.
+
+  ENDLOOP.
+
+ENDFORM.                    " ZF_SHDB_A826
+*&---------------------------------------------------------------------*
+*&      Form  ZF_SHDB_A828
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_shdb_a828.
+
+  v_tabix = sy-tabix.
+
+  LOOP AT it_excela828 INTO wa_exca828.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'          '0100',
+    ' ' 'BDC_CURSOR'        'RV13A-KSCHL',
+    ' ' 'BDC_OKCODE'        '/00',
+    ' ' 'RV13A-KSCHL'       wa_exca828-kschl.
+
+    PERFORM zf_preenche_shdb USING:
+     'X'  'SAPLV14A'        '0100',
+     ' '  'BDC_CURSOR'      'RV130-SELKZ(05)',
+     ' '  'BDC_OKCODE'      '=WEIT',
+     ' '  'RV130-SELKZ(01)'   ' ',
+     ' '  'RV130-SELKZ(05)'   'X'.
+
+    PERFORM zf_preenche_shdb USING:
+    'X'  'SAPMV13A'         '1828',
+    ' '  'BDC_CURSOR'       'RV13A-DATBI(01)',
+    ' '  'BDC_OKCODE'       '/00',
+    ' '  'KOMG-WERKS'       wa_exca828-werks,
+    ' '  'KOMG-ZZTXJCD'     wa_exca828-zztxjcd,
+    ' '  'KOMG-KONDA'       wa_exca828-konda,
+    ' '  'KOMG-MATNR(01)'   wa_exca828-matnr,
+    ' '  'KONP-KBETR(01)'   wa_exca828-montante,
+    ' '  'RV13A-DATAB(01)'  wa_exca828-datai,
+    ' '  'RV13A-DATBI(01)'  wa_exca828-dataf,
+    ' '  'KONP-KONWA(01)'   wa_exca828-konwa.
+
+    PERFORM zf_preenche_shdb USING:
+    'X' 'SAPMV13A'       '1828',
+    ' ' 'BDC_CURSOR'     'KOMG-MATNR(01)',
+    ' '	'BDC_OKCODE'         '=SICH'.
+
+    PERFORM zf_executa_vk11.
+
+  ENDLOOP.
+
+ENDFORM.                    " ZF_SHDB_A828
+*&---------------------------------------------------------------------*
+*&      Form  PREENCHE_SHDB
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_preenche_shdb  USING dynbegin
+                          name
+                          value.
+
+  IF dynbegin EQ 'X'.
+    wa_shdb-program  = name.
+    wa_shdb-dynpro   = value.
+    wa_shdb-dynbegin = dynbegin.
+    APPEND wa_shdb TO it_shdb.
+
+  ELSE.
+    wa_shdb-fnam     = name.
+    wa_shdb-fval     = value.
+    APPEND wa_shdb TO it_shdb.
+  ENDIF.
+
+  CLEAR wa_shdb.
+
+ENDFORM.                    " PREENCHE_SHDB
+*&---------------------------------------------------------------------*
+*&      Form  EXECUTA_VK11
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_executa_vk11.
+
+  DATA: vl_mode TYPE c,
+        vl_mgs  TYPE c.
+
+  CLEAR it_msg.
+  FREE it_msg.
+
+  vl_mode = 'N'."'A'.
+  vl_mgs  = 'S'.
+
+  CALL TRANSACTION 'VK11' USING it_shdb
+                           MODE vl_mode
+                           UPDATE vl_mgs
+                           MESSAGES INTO it_msg.
+
+  LOOP AT it_msg WHERE msgtyp EQ 'E'.
+    PERFORM zf_montamsg.
+  ENDLOOP.
+
+  FREE: it_shdb.
+
+ENDFORM.                    " EXECUTA_VK11
+*&---------------------------------------------------------------------*
+*&      Form  MONTAMSG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_montamsg.
+
+  CLEAR st_wamsg.
+
+  st_wamsg-arquivo   = vfile.
+  st_wamsg-linha     = ( v_tabix + 1 ).
+
+  CONDENSE st_wamsg-linha NO-GAPS.
+
+  SELECT SINGLE text
+    INTO st_wamsg-mensagem
+    FROM t100
+   WHERE sprsl EQ 'PT'
+     AND arbgb EQ it_msg-msgid
+     AND msgnr EQ it_msg-msgnr.
+
+  APPEND st_wamsg TO st_tbmsg.
+
+ENDFORM.                    " MONTAMSG
+*&---------------------------------------------------------------------*
+*&      Form  ZF_EXIBIR_REL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_exibir_rel.
+
+  DATA:l_texto TYPE lvc_title.
+  l_texto = text-005.
+*** Opções de layout do ALV
+  t_print-no_print_listinfos  = 'X'.
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      i_grid_title       = l_texto
+      is_layout          = t_layout
+      it_fieldcat        = t_fieldcat[]
+      it_sort            = t_sort[]
+      i_default          = 'X'
+      i_save             = 'A'
+      is_print           = t_print
+    TABLES
+      t_outtab           = st_tbmsg[]
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+ENDFORM.                    " ZF_EXIBIR_REL
+*&---------------------------------------------------------------------*
+*&      Form  ZF_BUILD_CATALOG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_build_catalog.
+  st_fieldcat-fieldname   = 'ARQUIVO'.
+  st_fieldcat-seltext_m   = text-b01.
+  st_fieldcat-col_pos     =  1.
+  st_fieldcat-outputlen   = 20.
+  "st_fieldcat-key         = 'X'.
+
+  APPEND st_fieldcat TO t_fieldcat.
+  CLEAR st_fieldcat.
+
+  st_fieldcat-fieldname   = 'LINHA'.
+  st_fieldcat-seltext_m   = text-b02.
+  st_fieldcat-col_pos     =  2.
+  st_fieldcat-outputlen   = 10.
+  APPEND st_fieldcat TO t_fieldcat.
+  CLEAR st_fieldcat.
+
+  st_fieldcat-fieldname   = 'MENSAGEM'.
+  st_fieldcat-seltext_m   = text-b03.
+  st_fieldcat-outputlen  = 20.
+  st_fieldcat-col_pos     =  9.
+  APPEND st_fieldcat TO t_fieldcat.
+  CLEAR st_fieldcat.
+
+ENDFORM.                    " ZF_BUILD_CATALOG
+*&---------------------------------------------------------------------*
+*&      Form  ZF_CARREGAR_BACKGROUND
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+FORM zf_carregar_background.
+
+  DATA:  st_raw(4096) TYPE c.
+
+  CLEAR: wa_exca821,
+         wa_exca824,
+         wa_exca826,
+         wa_exca828,
+         v_tabix.
+
+  FREE: it_excela821,
+        it_excela824,
+        it_excela826,
+        it_excela828.
+
+  OPEN DATASET vfile FOR INPUT IN TEXT MODE ENCODING DEFAULT.
+  IF sy-subrc IS INITIAL.
+    IF NOT rb1 IS INITIAL.
+      DO.
+        v_tabix = v_tabix + 1.
+        READ DATASET vfile INTO st_raw.
+        IF sy-subrc IS INITIAL.
+          IF v_tabix NE 1.
+            SPLIT st_raw AT ';' INTO
+            wa_exca821-kschl  wa_exca821-werks  wa_exca821-zztxjcd
+            wa_exca821-kunnr  wa_exca821-matnr  wa_exca821-montante
+            wa_exca821-konwa  wa_exca821-datai  wa_exca821-dataf.
+
+            APPEND wa_exca821 TO it_excela821.
+          ENDIF.
+        ELSE.
+          EXIT.
+        ENDIF.
+      ENDDO.
+
+    ELSEIF NOT rb2 IS INITIAL.
+      DO.
+        v_tabix = v_tabix + 1.
+        READ DATASET vfile INTO st_raw.
+        IF sy-subrc IS INITIAL.
+          IF v_tabix NE 1.
+            SPLIT st_raw AT ';' INTO
+            wa_exca824-kschl  wa_exca824-werks  wa_exca824-zztxjcd
+            wa_exca824-hienr  wa_exca824-matnr  wa_exca824-montante
+            wa_exca824-konwa  wa_exca824-datai  wa_exca824-dataf.
+
+            APPEND wa_exca824 TO it_excela824.
+          ENDIF.
+        ELSE.
+          EXIT.
+        ENDIF.
+      ENDDO.
+
+    ELSEIF NOT rb3 IS INITIAL.
+      DO.
+        v_tabix = v_tabix + 1.
+        READ DATASET vfile INTO st_raw.
+        IF sy-subrc IS INITIAL.
+          IF v_tabix NE 1.
+            SPLIT st_raw AT ';' INTO
+            wa_exca826-kschl  wa_exca826-werks  wa_exca826-zztxjcd
+            wa_exca826-hienr  wa_exca826-matnr  wa_exca826-montante
+            wa_exca826-konwa  wa_exca826-datai  wa_exca826-dataf.
+
+            APPEND wa_exca826 TO it_excela826.
+          ENDIF.
+        ELSE.
+          EXIT.
+        ENDIF.
+      ENDDO.
+
+    ELSEIF NOT rb4 IS INITIAL.
+      DO.
+        v_tabix = v_tabix + 1.
+        READ DATASET vfile INTO st_raw.
+        IF sy-subrc IS INITIAL.
+          IF v_tabix NE 1.
+            SPLIT st_raw AT ';' INTO
+            wa_exca828-kschl  wa_exca828-werks  wa_exca828-zztxjcd
+            wa_exca828-konda  wa_exca828-matnr  wa_exca828-montante
+            wa_exca828-konwa  wa_exca828-datai  wa_exca828-dataf.
+
+            APPEND wa_exca828 TO it_excela828.
+          ENDIF.
+        ELSE.
+          EXIT.
+        ENDIF.
+      ENDDO.
+    ENDIF.
+  ENDIF.
+ENDFORM.                    " ZF_CARREGAR_BACKGROUND
